@@ -1360,8 +1360,13 @@ If QUIET is non nil, then an overlay and the merlin types can be used."
     (merlin--type-expression exp on-success on-error)))
 
 ;; TYPE ENCLOSING
+(defun merlin--type-enclosing-reset ()
+  (setq merlin-enclosing-types nil)
+  (setq merlin-enclosing-offset -1))
+
 (defun merlin--type-enclosing-query ()
   "Get the enclosings around point from merlin and sets MERLIN-ENCLOSING-TYPES."
+  (merlin--type-enclosing-reset)
   (let ((types (merlin-send-command (list 'type 'enclosing 'at (merlin-unmake-point (point)))
                                     (lambda (exn) nil))))
     (when types
@@ -1408,6 +1413,7 @@ If QUIET is non nil, then an overlay and the merlin types can be used."
   (let ((keymap (make-sparse-keymap)))
     (define-key keymap (kbd "C-<up>") 'merlin-type-enclosing-go-up)
     (define-key keymap (kbd "C-<down>") 'merlin-type-enclosing-go-down)
+    (define-key keymap (kbd "C-d") 'merlin--destruct-enclosing)
     (define-key keymap (kbd "C-w") #'(lambda ()
                                      (interactive)
                                      (let ((data (elt merlin-enclosing-types merlin-enclosing-offset)))
@@ -1421,7 +1427,8 @@ If QUIET is non nil, then an overlay and the merlin types can be used."
 (defun merlin--type-enclosing-after ()
   (when (and (fboundp 'set-temporary-overlay-map)
              merlin-arrow-keys-type-enclosing)
-    (set-temporary-overlay-map merlin-type-enclosing-map t)))
+    (set-temporary-overlay-map merlin-type-enclosing-map t
+                               'merlin--type-enclosing-reset)))
 
 (defun merlin-type-enclosing ()
   "Print the type of the expression under point (or of the region, if it exists)."
@@ -1477,6 +1484,7 @@ is active)."
       (indent-region start (point)))))
 
 (defun merlin--destruct-enclosing ()
+  (interactive)
   (let* ((bounds (cdr (elt merlin-enclosing-types merlin-enclosing-offset)))
 	 (start  (merlin-unmake-point (car bounds)))
 	 (stop   (merlin-unmake-point (cdr bounds)))
@@ -1492,17 +1500,18 @@ is active)."
       (let* ((loc (car result))
 	     (start (cdr (assoc 'start loc)))
 	     (stop (cdr (assoc 'end loc))))
-	(merlin--replace-buff-portion start stop (cadr result))))))
+	(merlin--replace-buff-portion start stop (cadr result))))
+    (merlin--type-enclosing-reset)))
 
 (defun merlin-destruct ()
   "Case analyse the current enclosing"
   (interactive)
   (merlin-sync-to-point)
-  (if (merlin--type-enclosing-query)
-      (progn
-	(setq merlin-enclosing-offset -1)
-	(merlin--destruct-enclosing))
-    (error "merlin: no result")))
+  (if (not merlin-enclosing-types)
+    (if (merlin--type-enclosing-query)
+      (merlin--destruct-enclosing)
+      (error "merlin: no result"))
+    (merlin--destruct-enclosing)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
