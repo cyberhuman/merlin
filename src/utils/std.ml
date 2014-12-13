@@ -755,3 +755,5 @@ module Obj = struct
         true
       with Not_found -> false
 end
+
+let (@@) f x = f x
